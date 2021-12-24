@@ -1,31 +1,31 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
-import torch
-import torch.nn as nn
+import paddle
+import paddle.nn as nn
 
 
-class SiLU(nn.Module):
+class SiLU(nn.Layer):
     """export-friendly version of nn.SiLU()"""
 
     @staticmethod
     def forward(x):
-        return x * torch.sigmoid(x)
+        return x * nn.Sigmoid(x)
 
 
 def get_activation(name="silu", inplace=True):
     if name == "silu":
-        module = nn.SiLU(inplace=inplace)
+        module = nn.Silu()
     elif name == "relu":
-        module = nn.ReLU(inplace=inplace)
+        module = nn.ReLU()
     elif name == "lrelu":
-        module = nn.LeakyReLU(0.1, inplace=inplace)
+        module = nn.LeakyReLU(0.1)
     else:
         raise AttributeError("Unsupported act type: {}".format(name))
     return module
 
 
-class BaseConv(nn.Module):
+class BaseConv(nn.Layer):
     """A Conv2d -> Batchnorm -> silu/leaky relu block"""
 
     def __init__(
@@ -34,7 +34,7 @@ class BaseConv(nn.Module):
         super().__init__()
         # same padding
         pad = (ksize - 1) // 2
-        self.conv = nn.Conv2d(
+        self.conv = nn.Conv2D(
             in_channels,
             out_channels,
             kernel_size=ksize,
@@ -43,7 +43,7 @@ class BaseConv(nn.Module):
             groups=groups,
             bias=bias,
         )
-        self.bn = nn.BatchNorm2d(out_channels)
+        self.bn = nn.BatchNorm2D(out_channels)
         self.act = get_activation(act, inplace=True)
 
     def forward(self, x):
@@ -53,7 +53,7 @@ class BaseConv(nn.Module):
         return self.act(self.conv(x))
 
 
-class DWConv(nn.Module):
+class DWConv(nn.Layer):
     """Depthwise Conv + Conv"""
 
     def __init__(self, in_channels, out_channels, ksize, stride=1, act="silu"):
@@ -75,7 +75,7 @@ class DWConv(nn.Module):
         return self.pconv(x)
 
 
-class Bottleneck(nn.Module):
+class Bottleneck(nn.Layer):
     # Standard bottleneck
     def __init__(
         self,
@@ -100,7 +100,7 @@ class Bottleneck(nn.Module):
         return y
 
 
-class ResLayer(nn.Module):
+class ResLayer(nn.Layer):
     "Residual layer with `in_channels` inputs."
 
     def __init__(self, in_channels: int):
@@ -118,7 +118,7 @@ class ResLayer(nn.Module):
         return x + out
 
 
-class SPPBottleneck(nn.Module):
+class SPPBottleneck(nn.Layer):
     """Spatial pyramid pooling layer used in YOLOv3-SPP"""
 
     def __init__(
@@ -138,12 +138,12 @@ class SPPBottleneck(nn.Module):
 
     def forward(self, x):
         x = self.conv1(x)
-        x = torch.cat([x] + [m(x) for m in self.m], dim=1)
+        x = paddle.concat([x] + [m(x) for m in self.m], axis=1)
         x = self.conv2(x)
         return x
 
 
-class CSPLayer(nn.Module):
+class CSPLayer(nn.Layer):
     """C3 in yolov5, CSP Bottleneck with 3 convolutions"""
 
     def __init__(
@@ -180,11 +180,11 @@ class CSPLayer(nn.Module):
         x_1 = self.conv1(x)
         x_2 = self.conv2(x)
         x_1 = self.m(x_1)
-        x = torch.cat((x_1, x_2), dim=1)
+        x = paddle.concat((x_1, x_2), axis=1)
         return self.conv3(x)
 
 
-class Focus(nn.Module):
+class Focus(nn.Layer):
     """Focus width and height information into channel space."""
 
     def __init__(self, in_channels, out_channels, ksize=1, stride=1, act="silu"):
@@ -197,13 +197,13 @@ class Focus(nn.Module):
         patch_top_right = x[..., ::2, 1::2]
         patch_bot_left = x[..., 1::2, ::2]
         patch_bot_right = x[..., 1::2, 1::2]
-        x = torch.cat(
+        x = paddle.concat(
             (
                 patch_top_left,
                 patch_bot_left,
                 patch_top_right,
                 patch_bot_right,
             ),
-            dim=1,
+            axis=1,
         )
         return self.conv(x)

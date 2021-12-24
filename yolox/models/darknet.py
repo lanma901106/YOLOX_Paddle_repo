@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
 
-from torch import nn
+from paddle import nn
 
 from .network_blocks import BaseConv, CSPLayer, DWConv, Focus, ResLayer, SPPBottleneck
 
 
-class Darknet(nn.Module):
+class Darknet(nn.Layer):
     # number of blocks from dark2 to dark5.
     depth2blocks = {21: [1, 2, 2, 1], 53: [2, 8, 8, 4]}
 
