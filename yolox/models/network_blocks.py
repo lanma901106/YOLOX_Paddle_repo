@@ -41,7 +41,7 @@ class BaseConv(nn.Layer):
             stride=stride,
             padding=pad,
             groups=groups,
-            bias=bias,
+            bias_attr=bias,
         )
         self.bn = nn.BatchNorm2D(out_channels)
         self.act = get_activation(act, inplace=True)
